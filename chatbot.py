@@ -15,6 +15,7 @@ import asyncio
 import faiss
 import numpy as np
 from flask import Flask, request, jsonify, Response
+from flask_cors import CORS
 
 # Load biến môi trường
 load_dotenv()
@@ -22,6 +23,7 @@ load_dotenv()
 
 # Flask API
 app = Flask(__name__)
+CORS(app)  # Cho phép tất cả domain gọi API
 
 @app.route('/health', methods=['GET'])
 def health():
