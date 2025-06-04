@@ -215,14 +215,10 @@ def favicon():
 # index.add(np.array(review_embeddings))
 
 api_key = os.getenv("OPENAI_API_KEY")
-port= os.getenv("PORT", 5000)
 debug_mode = os.getenv("DEBUG_MODE")
 client = AsyncOpenAI(api_key=api_key)
 
 if __name__ == '__main__':
-    # Build hoặc load FAISS index trước khi start Flask
     ensure_faiss_index()
-    # Thêm dòng này để chỉ định đường dẫn cho nltk data
-    
     nltk.data.path.append('./nltk_data')
-    app.run(debug=debug_mode, port=port)
+    app.run(host="0.0.0.0", debug=debug_mode)
