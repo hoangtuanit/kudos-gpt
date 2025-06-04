@@ -1,0 +1,8 @@
+flask
+gunicorn
+openai>=1.0.0
+python-dotenv
+pandas
+nltk
+faiss-cpu
+numpy
