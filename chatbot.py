@@ -44,8 +44,8 @@ def prepare_nltk_resources():
         with open(NLTK_RES_PATH, "rb") as f:
             stop_words, lemmatizer = pickle.load(f)
     else:
-        nltk.download('stopwords')
-        nltk.download('wordnet')
+        nltk.download('stopwords', download_dir='./nltk_data')
+        nltk.download('wordnet', download_dir='./nltk_data')
         stop_words = set(stopwords.words('english'))
         lemmatizer = WordNetLemmatizer()
         with open(NLTK_RES_PATH, "wb") as f:
@@ -219,4 +219,7 @@ client = AsyncOpenAI(api_key=api_key)
 if __name__ == '__main__':
     # Build hoặc load FAISS index trước khi start Flask
     ensure_faiss_index()
+    # Thêm dòng này để chỉ định đường dẫn cho nltk data
+    
+    nltk.data.path.append('./nltk_data')
     app.run(debug=True, port=5000, host='0.0.0.0')
