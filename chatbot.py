@@ -37,19 +37,12 @@ reviews = df['cleaned_review'].dropna().astype(str).tolist()
 ## Limit first 100 reviews for testing
 reviews = reviews[:100]
 
-NLTK_RES_PATH = "nltk_resources.pkl"
+NLTK_RES_PATH = "./nltk/nltk_resources.pkl"
 
 def prepare_nltk_resources():
-    if os.path.exists(NLTK_RES_PATH):
-        with open(NLTK_RES_PATH, "rb") as f:
-            stop_words, lemmatizer = pickle.load(f)
-    else:
-        nltk.download('stopwords', download_dir='./nltk_data')
-        nltk.download('wordnet', download_dir='./nltk_data')
-        stop_words = set(stopwords.words('english'))
-        lemmatizer = WordNetLemmatizer()
-        with open(NLTK_RES_PATH, "wb") as f:
-            pickle.dump((stop_words, lemmatizer), f)
+    nltk.data.path.append('./nltk_data')
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
     return stop_words, lemmatizer
 
 # Sử dụng:
