@@ -6,3 +6,4 @@ pandas
 nltk
 faiss-cpu
 numpy
+flask_cors
