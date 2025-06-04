@@ -214,6 +214,7 @@ Answer in helpful and natural language. Be clear and honest.
 # index.add(np.array(review_embeddings))
 
 api_key = os.getenv("OPENAI_API_KEY")
+debug_mode = os.getenv("DEBUG_MODE")
 client = AsyncOpenAI(api_key=api_key)
 
 if __name__ == '__main__':
@@ -222,4 +223,4 @@ if __name__ == '__main__':
     # Thêm dòng này để chỉ định đường dẫn cho nltk data
     
     nltk.data.path.append('./nltk_data')
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    app.run(debug=debug_mode, port=5000, host='0.0.0.0')
