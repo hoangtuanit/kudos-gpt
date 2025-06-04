@@ -14,7 +14,7 @@ from openai import AsyncOpenAI
 import asyncio
 import faiss
 import numpy as np
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 
 # Load biến môi trường
@@ -201,12 +201,21 @@ Answer in helpful and natural language. Be clear and honest.
 
     return Response(generate(), mimetype='text/plain')
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(
+        os.path.join(app.root_path, 'static'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
+
 # # Tạo index FAISS
 # review_embeddings = [get_embedding(review) for review in reviews]
 # index = faiss.IndexFlatL2(len(review_embeddings[0]))
 # index.add(np.array(review_embeddings))
 
 api_key = os.getenv("OPENAI_API_KEY")
+port= os.getenv("PORT", 5000)
 debug_mode = os.getenv("DEBUG_MODE")
 client = AsyncOpenAI(api_key=api_key)
 
@@ -216,4 +225,4 @@ if __name__ == '__main__':
     # Thêm dòng này để chỉ định đường dẫn cho nltk data
     
     nltk.data.path.append('./nltk_data')
-    app.run(debug=debug_mode, port=5000, host='0.0.0.0')
+    app.run(debug=debug_mode, port=port)
