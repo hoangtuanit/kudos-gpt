@@ -7,3 +7,6 @@ nltk
 faiss-cpu
 numpy
 flask_cors
+transformers
+torch
+scikit-learngit

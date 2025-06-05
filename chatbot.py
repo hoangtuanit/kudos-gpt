@@ -7,8 +7,6 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from dotenv import load_dotenv
-import os
-import pickle
 import openai
 from openai import AsyncOpenAI
 import asyncio
@@ -49,9 +47,14 @@ def prepare_nltk_resources():
 stop_words, lemmatizer = prepare_nltk_resources()
 
 def preprocess_review(review):
-    # Loại bỏ ký tự đặc biệt và số
-    review = re.sub(r'[^a-zA-Z\s]', '', review)
+     # Loại bỏ ký tự đặc biệt, giữ lại chữ, số, dấu câu cơ bản
+    review = re.sub(r"[^a-zA-ZÀ-ỹ0-9,.!?;:\s\-]", '', review)
     # Chuyển về chữ thường
+    review = re.sub(r'https?://\S+|www\.\S+', '', review)
+    review = re.sub(r'<.*?>', '', review)
+    # Rút gọn khoảng trắng
+    review = re.sub(r'\s+', ' ', review).strip()
+    # Tách từ
     review = review.lower()
     # Tách từ
     words = review.split()
@@ -69,7 +72,7 @@ def get_embedding(text):
     print(f"Generating embedding for text: {text[:30]}...")  # Log first 30 chars
     response = openai.embeddings.create(
         model="text-embedding-3-small",
-        input=[text]
+        input=text  # Pass as string, not list
     )
 
     return np.array(response.data[0].embedding)
@@ -209,6 +212,116 @@ def favicon():
         mimetype='image/vnd.microsoft.icon'
     )
 
+# --- SUMMARIZATION API ---
+import asyncio
+
+async def summarize_features_for_buyer(reviews):
+    prompt = f"""
+        You will be given a batch of product reviews. Summarize them by extracting:
+
+        - Overall sentiment (positive, negative, mixed)
+        - Common PROS: list 3–5 things customers often praised
+        - Common CONS: list 2–3 frequent complaints
+        - Optional: 1–2 short, representative quotes
+        - Final verdict: Should a potential buyer feel confident in the product?
+
+        Here are the reviews:
+        ---
+        {reviews}
+        ---
+    """
+    completion = await client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=300,
+        temperature=0.3
+    )
+    return completion.choices[0].message.content.strip()
+
+async def summarize_features_for_merchant(reviews):
+    prompt = f"""
+        You are an assistant for a business owner who wants to improve their product based on customer feedback.
+
+Given a list of customer reviews, summarize the most common positive and negative opinions. Group the feedback into key aspects (e.g., battery, design, performance, price, etc.). Then, give clear suggestions to improve the product based on customer concerns.
+
+Reviews:
+        ---
+        {reviews}
+        ---
+    """
+    completion = await client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=300,
+        temperature=0.3
+    )
+    return completion.choices[0].message.content.strip()
+
+def parse_summary_from_text(text):
+    # Đơn giản: tách các mục dựa trên tiêu đề thường gặp
+    result = {"pros": [], "cons": [], "sentiment": None, "quotes": [], "verdict": None}
+    # Sentiment
+    sentiment_match = re.search(r"Overall sentiment\s*[:\-]?\s*(.+)", text, re.IGNORECASE)
+    if sentiment_match:
+        result["sentiment"] = sentiment_match.group(1).strip()
+    # Pros
+    pros_match = re.search(r"Common PROS\s*[:\-]?\s*(.+?)(?:Common CONS|Cons|\n\n|$)", text, re.IGNORECASE | re.DOTALL)
+    if pros_match:
+        pros_text = pros_match.group(1)
+        result["pros"] = [p.strip('-•* \n') for p in pros_text.strip().split('\n') if p.strip('-•* ')]
+    # Cons
+    cons_match = re.search(r"Common CONS\s*[:\-]?\s*(.+?)(?:Optional|\n\n|$)", text, re.IGNORECASE | re.DOTALL)
+    if not cons_match:
+        cons_match = re.search(r"Cons\s*[:\-]?\s*(.+?)(?:Optional|\n\n|$)", text, re.IGNORECASE | re.DOTALL)
+    if cons_match:
+        cons_text = cons_match.group(1)
+        result["cons"] = [c.strip('-•* \n') for c in cons_text.strip().split('\n') if c.strip('-•* ')]
+    # Quotes
+    quotes_match = re.search(r"quotes?\s*[:\-]?\s*(.+?)(?:Final verdict|\n\n|$)", text, re.IGNORECASE | re.DOTALL)
+    if quotes_match:
+        quotes_text = quotes_match.group(1)
+        quotes = re.findall(r'"([^"]+)"', quotes_text)
+        if not quotes:
+            quotes = [q.strip('-•* \n') for q in quotes_text.strip().split('\n') if q.strip('-•* ')]
+        result["quotes"] = quotes
+    # Verdict
+    verdict_match = re.search(r"Final verdict\s*[:\-]?\s*(.+)", text, re.IGNORECASE)
+    if verdict_match:
+        result["verdict"] = verdict_match.group(1).strip()
+    return result
+
+@app.route('/summary-buyer', methods=['POST'])
+def summary_buyer():
+    data = request.json
+    reviews_input = data.get('reviews')
+    if not reviews_input:
+        reviews_input = reviews
+    if isinstance(reviews_input, list):
+        reviews_text = '\n'.join(reviews_input)
+    else:
+        reviews_text = str(reviews_input)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    summary_text = loop.run_until_complete(summarize_features_for_buyer(reviews_text))
+    summary = parse_summary_from_text(summary_text)
+    return jsonify({'summary': summary})
+
+@app.route('/summary-merchant', methods=['POST'])
+def summary_merchant():
+    data = request.json
+    reviews_input = data.get('reviews')
+    if not reviews_input:
+        reviews_input = reviews
+    if isinstance(reviews_input, list):
+        reviews_text = '\n'.join(reviews_input)
+    else:
+        reviews_text = str(reviews_input)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    summary_text = loop.run_until_complete(summarize_features_for_merchant(reviews_text))
+    summary = parse_summary_from_text(summary_text)
+    return jsonify({'summary': summary})
+
 # # Tạo index FAISS
 # review_embeddings = [get_embedding(review) for review in reviews]
 # index = faiss.IndexFlatL2(len(review_embeddings[0]))
@@ -221,4 +334,5 @@ client = AsyncOpenAI(api_key=api_key)
 if __name__ == '__main__':
     ensure_faiss_index()
     nltk.data.path.append('./nltk_data')
-    app.run(host="0.0.0.0", debug=debug_mode)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
